@@ -42,6 +42,21 @@ async def _get_channel(bot: discord.Client, channel_id: int) -> Optional[discord
     return channel
 
 
+def _render_embed(bot: discord.Client, event: Event, responses) -> discord.Embed:
+    """Build the branded check-in embed using the bot's configured settings."""
+    s = bot.settings
+    return build_checkin_embed(
+        event,
+        responses,
+        tz_name=s.timezone,
+        tz_label=s.timezone_label,
+        brand_name=s.brand_name,
+        footer_name=s.footer_name,
+        squad_size=s.squad_size,
+        brand_icon_url=(s.brand_icon_url or None),
+    )
+
+
 async def _fetch_message(
     bot: discord.Client, channel_id: Optional[int], message_id: Optional[int]
 ) -> Optional[discord.Message]:
@@ -74,12 +89,7 @@ async def refresh_checkin_message(
         if event is None:
             return
         responses = await event_service.list_responses(session, event)
-        embed = build_checkin_embed(
-            event,
-            responses,
-            tz_name=bot.settings.timezone,
-            tz_label=bot.settings.timezone_label,
-        )
+        embed = _render_embed(bot, event, responses)
         is_locked = event.status is EventStatus.LOCKED
 
     channel = await _get_channel(bot, channel_id)
@@ -169,12 +179,7 @@ async def post_daily_checkin(
             default_type=default_type,
         )
         responses = await event_service.list_responses(session, event)
-        embed = build_checkin_embed(
-            event,
-            responses,
-            tz_name=tz,
-            tz_label=bot.settings.timezone_label,
-        )
+        embed = _render_embed(bot, event, responses)
 
         # If we already posted today and that message still exists, just refresh it.
         existing = await _fetch_message(bot, event.channel_id, event.message_id)
@@ -190,7 +195,7 @@ async def post_daily_checkin(
             await session.commit()
             return None, False
         message = await channel.send(
-            content="@everyone — today's check-in is up! Mark your availability below.",
+            content="@everyone **roster call is live** — lock in below. 🎮",
             embed=embed,
             view=CheckInView(),
             allowed_mentions=discord.AllowedMentions(everyone=True),

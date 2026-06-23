@@ -1,7 +1,8 @@
-"""Builders that turn event/response data into Discord embeds.
+"""Builders that turn event/response data into a premium check-in embed.
 
 The embed is always rendered from database state, never from in-memory UI state,
-so concurrent button clicks cannot desync the displayed board.
+so concurrent button clicks cannot desync the displayed board. The squad bar
+"fills" because the board is re-rendered on every Available click.
 """
 
 from __future__ import annotations
@@ -12,25 +13,29 @@ from zoneinfo import ZoneInfo
 import discord
 
 from database.models import Event, EventStatus, Response, ResponseState
-from utils.time_utils import as_utc, format_ampm, parse_hhmm
+from utils.time_utils import as_utc, at_local_time_utc, format_ampm, parse_hhmm
 
-_STATE_ORDER = [
-    ResponseState.AVAILABLE,
-    ResponseState.LATE,
-    ResponseState.UNAVAILABLE,
-]
-_STATE_LABEL = {
-    ResponseState.AVAILABLE: "✅ Available",
-    ResponseState.LATE: "🕒 Late",
-    ResponseState.UNAVAILABLE: "❌ Unavailable",
-}
+# Only these states render. Legacy LATE rows (Late was removed) are ignored.
+_STATE_ORDER = [ResponseState.AVAILABLE, ResponseState.UNAVAILABLE]
+
+_OPEN_COLOR = discord.Color(0x57F287)   # Discord green
+_LOCKED_COLOR = discord.Color(0x80848E)  # muted grey
+
+_BAR_FILLED = "🟩"
+_BAR_EMPTY = "⬜"
 
 
-def _format_player(response: Response) -> str:
-    name = response.player.display_name
-    if response.state is ResponseState.LATE and response.eta:
-        return f"{name} — _{response.eta}_"
-    return name
+def _progress_bar(available: int, squad_size: int) -> str:
+    """Render the squad availability bar: one green block per Available player."""
+    filled = max(0, min(available, squad_size))
+    bar = _BAR_FILLED * filled + _BAR_EMPTY * (squad_size - filled)
+    if available >= squad_size and squad_size > 0:
+        return f"{bar}\n**{available}/{squad_size}** · 🔥 **FULL SQUAD LOCKED IN**"
+    return f"{bar}\n**{available}/{squad_size}** locked in"
+
+
+def _names(responses: list[Response]) -> str:
+    return " · ".join(r.player.display_name for r in responses) or "—"
 
 
 def build_checkin_embed(
@@ -39,49 +44,59 @@ def build_checkin_embed(
     *,
     tz_name: str = "UTC",
     tz_label: str = "",
+    brand_name: str = "",
+    footer_name: str = "",
+    squad_size: int = 11,
+    brand_icon_url: str | None = None,
 ) -> discord.Embed:
-    """Build the check-in board embed for an event and its responses.
-
-    All times are shown on a 12-hour clock in the configured timezone.
-    """
+    """Build the premium check-in board embed for an event and its responses."""
     grouped: dict[ResponseState, list[Response]] = {s: [] for s in _STATE_ORDER}
     for response in responses:
-        grouped[response.state].append(response)
+        if response.state in grouped:
+            grouped[response.state].append(response)
+    available = grouped[ResponseState.AVAILABLE]
+    out = grouped[ResponseState.UNAVAILABLE]
 
     is_locked = event.status is EventStatus.LOCKED
-    status_line = "🔒 Locked" if is_locked else "🟢 Open"
-    color = discord.Color.greyple() if is_locked else discord.Color.blurple()
-
-    label_suffix = f" {tz_label}".rstrip()
-    kickoff = f"{format_ampm(parse_hhmm(event.start_time))}{label_suffix}"
+    suffix = f" {tz_label}".rstrip()
+    tz = ZoneInfo(tz_name)
 
     embed = discord.Embed(
-        title=f"📋 Daily Check-In — {event.event_type.label}",
-        description=(
-            f"**Date:** {event.event_date:%A, %b %d %Y}\n"
-            f"🕖 **Kickoff:** {kickoff}\n"
-            f"**Status:** {status_line}"
-        ),
-        color=color,
+        title=f"🎮 Daily Check-In — {event.event_type.label}",
+        color=_LOCKED_COLOR if is_locked else _OPEN_COLOR,
+    )
+    if brand_name:
+        embed.set_author(name=brand_name, icon_url=brand_icon_url)
+
+    # Top row: Date · Kickoff (with live relative time) · Status
+    kickoff_unix = int(at_local_time_utc(event.event_date, event.start_time, tz_name).timestamp())
+    kickoff_str = f"{format_ampm(parse_hhmm(event.start_time))}{suffix}"
+    embed.add_field(name="📅 Date", value=f"**{event.event_date:%a, %b %d}**", inline=True)
+    embed.add_field(
+        name="🚀 Kickoff", value=f"**{kickoff_str}**\n<t:{kickoff_unix}:R>", inline=True
+    )
+    embed.add_field(
+        name="📊 Status",
+        value="🔒 **Locked**" if is_locked else "🟢 **Open**",
+        inline=True,
     )
 
-    for state in _STATE_ORDER:
-        members = grouped[state]
-        names = "\n".join(_format_player(r) for r in members) if members else "—"
-        embed.add_field(
-            name=f"{_STATE_LABEL[state]} ({len(members)})",
-            value=names,
-            inline=False,
-        )
+    # Squad availability bar
+    embed.add_field(
+        name="📋 Squad Availability",
+        value=_progress_bar(len(available), squad_size),
+        inline=False,
+    )
 
-    tz = ZoneInfo(tz_name)
+    # Rosters
+    embed.add_field(name=f"✅ Available — {len(available)}", value=_names(available), inline=False)
+    embed.add_field(name=f"❌ Out — {len(out)}", value=_names(out), inline=False)
+
+    # Footer: brand + lock time
     if is_locked and event.locked_at:
-        locked_local = as_utc(event.locked_at).astimezone(tz)
-        footer = f"Locked at {format_ampm(locked_local.timetz())}{label_suffix}"
+        lock_txt = f"Locked at {format_ampm(as_utc(event.locked_at).astimezone(tz).timetz())}{suffix}"
     else:
-        deadline_local = as_utc(event.lock_deadline).astimezone(tz)
-        footer = (
-            f"Responses lock at {format_ampm(deadline_local.timetz())}{label_suffix}"
-        )
-    embed.set_footer(text=footer)
+        lock_txt = f"Locks at {format_ampm(as_utc(event.lock_deadline).astimezone(tz).timetz())}{suffix}"
+    footer_text = f"{footer_name} · {lock_txt}" if footer_name else lock_txt
+    embed.set_footer(text=footer_text, icon_url=brand_icon_url)
     return embed

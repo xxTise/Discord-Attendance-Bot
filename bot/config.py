@@ -33,6 +33,12 @@ class Settings(BaseSettings):
     event_time: str = "19:00"  # default kickoff time (7:00 PM CT)
     lock_offset_minutes: int = 60  # responses lock this many minutes before kickoff
 
+    # Branding / premium board
+    brand_name: str = "PRO CLUBS · MATCHDAY OPS"  # embed author line
+    footer_name: str = "Pro Clubs Check-In"  # embed footer label
+    brand_icon_url: str = ""  # optional small icon URL for author/footer
+    squad_size: int = 11  # Available count that fills the squad bar
+
     database_url: str = "sqlite+aiosqlite:///./proclubs.db"
 
 

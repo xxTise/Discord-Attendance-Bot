@@ -54,6 +54,8 @@ class ResponseState(enum.Enum):
 
     AVAILABLE = "available"
     UNAVAILABLE = "unavailable"
+    # LATE is deprecated: the Late response option was removed from the UI. The
+    # value is retained only so historical rows already in the database still load.
     LATE = "late"
 
 

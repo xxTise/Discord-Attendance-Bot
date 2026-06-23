@@ -1,4 +1,4 @@
-"""Persistent check-in View with Available / Unavailable / Late buttons.
+"""Persistent check-in View with Available / Unavailable buttons.
 
 The View carries no per-event state: button ``custom_id``s are stable and the
 target event is resolved from the message the buttons are attached to. This lets
@@ -11,7 +11,6 @@ from __future__ import annotations
 import discord
 
 from database.models import ResponseState
-from views.late_modal import LateModal
 
 
 class CheckInView(discord.ui.View):
@@ -22,6 +21,7 @@ class CheckInView(discord.ui.View):
 
     @discord.ui.button(
         label="Available",
+        emoji="✅",
         style=discord.ButtonStyle.success,
         custom_id="checkin:available",
     )
@@ -31,7 +31,8 @@ class CheckInView(discord.ui.View):
         await self._record(interaction, ResponseState.AVAILABLE)
 
     @discord.ui.button(
-        label="Unavailable",
+        label="Out",
+        emoji="❌",
         style=discord.ButtonStyle.danger,
         custom_id="checkin:unavailable",
     )
@@ -39,21 +40,6 @@ class CheckInView(discord.ui.View):
         self, interaction: discord.Interaction, button: discord.ui.Button
     ) -> None:
         await self._record(interaction, ResponseState.UNAVAILABLE)
-
-    @discord.ui.button(
-        label="Late",
-        style=discord.ButtonStyle.secondary,
-        custom_id="checkin:late",
-    )
-    async def late(
-        self, interaction: discord.Interaction, button: discord.ui.Button
-    ) -> None:
-        await interaction.response.send_modal(
-            LateModal(
-                message_id=interaction.message.id,
-                channel_id=interaction.channel_id,
-            )
-        )
 
     async def _record(
         self, interaction: discord.Interaction, state: ResponseState
