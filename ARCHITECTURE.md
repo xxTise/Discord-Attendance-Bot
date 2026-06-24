@@ -1,4 +1,4 @@
-# CLAUDE.md
+# Architecture & Project Spec
 
 ## Project Overview
 

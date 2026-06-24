@@ -1,10 +1,10 @@
 # Pro Clubs Daily Check-In Bot
 
 A Discord bot that runs a daily availability check-in for a competitive EA FC Pro Clubs
-team: posts a check-in embed each day, collects Available / Unavailable / Late responses,
-locks responses at a deadline, and reminds players who have not responded.
+team: posts a check-in embed each day, collects Available / Out responses, locks
+responses before kickoff, and sends automatic kickoff reminders.
 
-See [CLAUDE.md](CLAUDE.md) for the architecture and build plan.
+See [ARCHITECTURE.md](ARCHITECTURE.md) for the architecture and build plan.
 
 ## Status
 
