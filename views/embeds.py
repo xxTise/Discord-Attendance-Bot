@@ -12,7 +12,7 @@ from zoneinfo import ZoneInfo
 
 import discord
 
-from database.models import Event, EventStatus, Response, ResponseState
+from database.models import Event, EventStatus, Position, Response, ResponseState
 from utils.time_utils import as_utc, at_local_time_utc, format_ampm, parse_hhmm
 
 # Only these states render. Legacy LATE rows (Late was removed) are ignored.
@@ -88,8 +88,29 @@ def build_checkin_embed(
         inline=False,
     )
 
-    # Rosters
-    embed.add_field(name=f"✅ Available — {len(available)}", value=_names(available), inline=False)
+    # Rosters — available players grouped by the position they checked in to.
+    by_position: dict[Position, list[Response]] = {p: [] for p in Position}
+    no_position: list[Response] = []
+    for response in available:
+        if response.position in by_position:
+            by_position[response.position].append(response)
+        else:
+            no_position.append(response)
+
+    for position in Position:
+        members = by_position[position]
+        embed.add_field(
+            name=f"{position.emoji} {position.label} — {len(members)}",
+            value=_names(members),
+            inline=False,
+        )
+    # Catch-all for legacy AVAILABLE rows recorded before positions existed.
+    if no_position:
+        embed.add_field(
+            name=f"✅ Available — {len(no_position)}",
+            value=_names(no_position),
+            inline=False,
+        )
     embed.add_field(name=f"❌ Out — {len(out)}", value=_names(out), inline=False)
 
     # Footer: brand + lock time

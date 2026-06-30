@@ -21,6 +21,7 @@ from database.models import (
     EventStatus,
     EventType,
     Player,
+    Position,
     Response,
     ResponseState,
 )
@@ -121,9 +122,13 @@ async def set_response(
     discord_id: int,
     display_name: str,
     state: ResponseState,
+    position: Optional[Position] = None,
     eta: Optional[str] = None,
 ) -> Response:
     """Create or update a player's response (upsert, one row per player per event).
+
+    ``position`` is kept only for AVAILABLE responses (the position the player
+    checks in to play); it is cleared for any other state.
 
     Raises:
         EventLockedError: if the event is locked.
@@ -137,6 +142,7 @@ async def set_response(
         raise ResponseValidationError("An ETA is required for a Late response.")
 
     normalized_eta = eta.strip() if state is ResponseState.LATE else None
+    normalized_position = position if state is ResponseState.AVAILABLE else None
     player = await get_or_create_player(
         session, discord_id=discord_id, display_name=display_name
     )
@@ -150,11 +156,13 @@ async def set_response(
             event_id=event.id,
             player_id=player.id,
             state=state,
+            position=normalized_position,
             eta=normalized_eta,
         )
         session.add(response)
     else:
         response.state = state
+        response.position = normalized_position
         response.eta = normalized_eta
         response.updated_at = utcnow()
     await session.flush()

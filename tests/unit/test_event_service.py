@@ -6,7 +6,7 @@ from datetime import date, datetime, timezone
 
 import pytest
 
-from database.models import EventStatus, EventType, ResponseState
+from database.models import EventStatus, EventType, Position, ResponseState
 from services import event_service
 from services.errors import (
     EventLockedError,
@@ -46,6 +46,62 @@ async def test_set_response_upserts_single_row(session):
     responses = await event_service.list_responses(session, event)
     assert len(responses) == 1
     assert responses[0].state is ResponseState.UNAVAILABLE
+
+
+async def test_available_stores_position(session):
+    event = await _event(session)
+    r = await event_service.set_response(
+        session,
+        event,
+        discord_id=1,
+        display_name="A",
+        state=ResponseState.AVAILABLE,
+        position=Position.MIDFIELD,
+    )
+    assert r.position is Position.MIDFIELD
+
+
+async def test_position_cleared_when_marked_out(session):
+    event = await _event(session)
+    await event_service.set_response(
+        session,
+        event,
+        discord_id=1,
+        display_name="A",
+        state=ResponseState.AVAILABLE,
+        position=Position.GK,
+    )
+    r = await event_service.set_response(
+        session,
+        event,
+        discord_id=1,
+        display_name="A",
+        state=ResponseState.UNAVAILABLE,
+    )
+    assert r.position is None
+
+
+async def test_switching_position_replaces_previous(session):
+    event = await _event(session)
+    await event_service.set_response(
+        session,
+        event,
+        discord_id=1,
+        display_name="A",
+        state=ResponseState.AVAILABLE,
+        position=Position.DEFENSE,
+    )
+    r = await event_service.set_response(
+        session,
+        event,
+        discord_id=1,
+        display_name="A",
+        state=ResponseState.AVAILABLE,
+        position=Position.OFFENSE,
+    )
+    assert r.position is Position.OFFENSE
+    responses = await event_service.list_responses(session, event)
+    assert len(responses) == 1
 
 
 async def test_late_requires_eta(session):
