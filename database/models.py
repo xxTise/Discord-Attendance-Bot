@@ -59,6 +59,40 @@ class ResponseState(enum.Enum):
     LATE = "late"
 
 
+class Position(enum.Enum):
+    """The position a player checks in to play.
+
+    Set only on AVAILABLE responses — an available player picks exactly one
+    position. UNAVAILABLE responses (and legacy rows from before positions were
+    added) carry no position.
+    """
+
+    GK = "gk"
+    DEFENSE = "defense"
+    MIDFIELD = "midfield"
+    OFFENSE = "offense"
+
+    @property
+    def label(self) -> str:
+        """Human-friendly display name, e.g. 'GK', 'Defense'."""
+        return {
+            "gk": "GK",
+            "defense": "Defense",
+            "midfield": "Midfield",
+            "offense": "Offense",
+        }[self.value]
+
+    @property
+    def emoji(self) -> str:
+        """Emoji used on buttons and in the check-in board."""
+        return {
+            "gk": "🧤",
+            "defense": "🛡️",
+            "midfield": "⚙️",
+            "offense": "⚔️",
+        }[self.value]
+
+
 class Player(Base):
     """A Discord member tracked by the bot."""
 
@@ -115,6 +149,10 @@ class Response(Base):
     event_id: Mapped[int] = mapped_column(ForeignKey("events.id"), index=True)
     player_id: Mapped[int] = mapped_column(ForeignKey("players.id"), index=True)
     state: Mapped[ResponseState] = mapped_column(SAEnum(ResponseState))
+    # Set on AVAILABLE responses (the position picked); NULL otherwise.
+    position: Mapped[Optional[Position]] = mapped_column(
+        SAEnum(Position), nullable=True
+    )
     eta: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
     updated_at: Mapped[datetime] = mapped_column(

@@ -15,17 +15,22 @@ def _ensure_columns(conn: Connection) -> None:
 
     Adds columns introduced after a table was first created. Idempotent.
     """
-    existing = {row[1] for row in conn.exec_driver_sql("PRAGMA table_info(events)")}
-    if "start_time" not in existing:
+    events = {row[1] for row in conn.exec_driver_sql("PRAGMA table_info(events)")}
+    if "start_time" not in events:
         conn.exec_driver_sql(
             "ALTER TABLE events ADD COLUMN start_time VARCHAR(5) "
             "NOT NULL DEFAULT '19:00'"
         )
-    if "pinged_offsets" not in existing:
+    if "pinged_offsets" not in events:
         conn.exec_driver_sql(
             "ALTER TABLE events ADD COLUMN pinged_offsets VARCHAR(50) "
             "NOT NULL DEFAULT ''"
         )
+
+    responses = {row[1] for row in conn.exec_driver_sql("PRAGMA table_info(responses)")}
+    if responses and "position" not in responses:
+        # Nullable: existing rows (and all UNAVAILABLE rows) keep a NULL position.
+        conn.exec_driver_sql("ALTER TABLE responses ADD COLUMN position VARCHAR(9)")
 
 
 async def init_models(engine: AsyncEngine) -> None:

@@ -11,6 +11,7 @@ from database.models import (
     EventStatus,
     EventType,
     Player,
+    Position,
     Response,
     ResponseState,
 )
@@ -106,8 +107,8 @@ def _event(status=EventStatus.OPEN):
     )
 
 
-def _resp(state, name):
-    r = Response(state=state, eta=None)
+def _resp(state, name, position=None):
+    r = Response(state=state, eta=None, position=position)
     r.player = Player(discord_id=1, display_name=name)
     return r
 
@@ -151,6 +152,28 @@ def test_progress_bar_full_squad():
     assert squad.count("🟩") == 11
     assert squad.count("⬜") == 0
     assert "FULL SQUAD" in squad
+
+
+def test_embed_groups_available_by_position():
+    responses = [
+        _resp(ResponseState.AVAILABLE, "Keeper", Position.GK),
+        _resp(ResponseState.AVAILABLE, "Backline", Position.DEFENSE),
+        _resp(ResponseState.AVAILABLE, "Engine", Position.MIDFIELD),
+        _resp(ResponseState.AVAILABLE, "Striker", Position.OFFENSE),
+        _resp(ResponseState.UNAVAILABLE, "Benched"),
+    ]
+    embed = build_checkin_embed(
+        _event(), responses, tz_name="America/Chicago", tz_label="CT", squad_size=11
+    )
+    assert "Keeper" in _field(embed, "GK")
+    assert "Backline" in _field(embed, "Defense")
+    assert "Engine" in _field(embed, "Midfield")
+    assert "Striker" in _field(embed, "Offense")
+    assert "Benched" in _field(embed, "Out")
+    # All four count toward the squad bar regardless of position.
+    squad = _field(embed, "Squad")
+    assert "4/11" in squad
+    assert squad.count("🟩") == 4
 
 
 def test_embed_ignores_legacy_late_rows():
