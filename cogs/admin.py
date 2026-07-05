@@ -156,7 +156,9 @@ class AdminCog(commands.Cog):
         if not self._is_captain(interaction):
             return await self._deny(interaction)
         await interaction.response.defer(ephemeral=True)
-        count = await checkin_manager.send_reminders(self.bot)
+        # DMs are disabled for now: remind publicly in the channel instead of
+        # messaging members privately.
+        count = await checkin_manager.send_reminders(self.bot, use_dm=False)
         await finish_and_delete(
             interaction,
             f"Reminded {count} member(s)." if count else "Nobody to remind.",
