@@ -89,12 +89,14 @@ def test_prekickoff_schedule():
     from bot.checkin_manager import PREKICKOFF_SCHEDULE
 
     by_offset = {p.offset_minutes: p for p in PREKICKOFF_SCHEDULE}
-    assert by_offset[75].target == "no-response"
-    assert "15 minutes" in by_offset[75].message
-    assert by_offset[60].target == "everyone"
-    assert "locked" in by_offset[60].message.lower()
+    # "Lobby up" nudge to available players 30 min before kickoff (unchanged).
     assert by_offset[30].target == "available"
     assert "lobby up" in by_offset[30].message.lower()
+    # "Now locked" announcement fires at kickoff-15, matching the 15-min lock.
+    assert by_offset[15].target == "everyone"
+    assert "locked" in by_offset[15].message.lower()
+    # The old early "locks in 15 minutes" warning was removed.
+    assert 75 not in by_offset
 
 
 def _event(status=EventStatus.OPEN):

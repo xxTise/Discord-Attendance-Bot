@@ -374,30 +374,23 @@ class PreKickoffPing:
 
 
 # Fired automatically by the every-minute scheduler, relative to each event's
-# kickoff (so they track changes made via /settime).
+# kickoff (so they track changes made via /settime). The "now locked" ping fires
+# at kickoff-15, matching LOCK_OFFSET_MINUTES=15 so the announcement coincides
+# with the actual auto-lock.
 PREKICKOFF_SCHEDULE: list[PreKickoffPing] = [
-    PreKickoffPing(
-        offset_minutes=75,
-        target="no-response",
-        message=(
-            "⚠️ **The check-in locks in 15 minutes!** If you haven't marked your "
-            "availability yet, do it now — once it's locked you won't be able to "
-            "set your status."
-        ),
-    ),
-    PreKickoffPing(
-        offset_minutes=60,
-        target="everyone",
-        message=(
-            "🔒 **Availability is now locked.** If your availability has changed, "
-            "please contact a captain directly to let them know your status."
-        ),
-    ),
     PreKickoffPing(
         offset_minutes=30,
         target="available",
         message=(
             "⏰ **30 minutes until kickoff** — start getting ready to lobby up!"
+        ),
+    ),
+    PreKickoffPing(
+        offset_minutes=15,
+        target="everyone",
+        message=(
+            "🔒 **Availability is now locked.** If your availability has changed, "
+            "please contact a captain directly to let them know your status."
         ),
     ),
 ]
