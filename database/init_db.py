@@ -27,11 +27,6 @@ def _ensure_columns(conn: Connection) -> None:
             "NOT NULL DEFAULT ''"
         )
 
-    responses = {row[1] for row in conn.exec_driver_sql("PRAGMA table_info(responses)")}
-    if responses and "position" not in responses:
-        # Nullable: existing rows (and all UNAVAILABLE rows) keep a NULL position.
-        conn.exec_driver_sql("ALTER TABLE responses ADD COLUMN position VARCHAR(9)")
-
 
 async def init_models(engine: AsyncEngine) -> None:
     """Create all tables that do not yet exist and apply column migrations."""

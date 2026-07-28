@@ -1,9 +1,9 @@
 # Pro Clubs Daily Check-In Bot
 
 A Discord bot that runs a daily availability check-in for a competitive EA FC Pro Clubs
-team: posts a check-in board each day, collects position-based availability
-(GK / Defense / Midfield / Offense, or Out), locks responses before kickoff, and sends
-automatic pre-kickoff reminders. Deployed 24/7 on AWS EC2.
+team: posts a check-in board each day, collects Available / Out responses, locks
+responses before kickoff, and sends automatic pre-kickoff reminders. Deployed 24/7 on
+AWS EC2.
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the architecture and build plan,
 [DEPLOY.md](DEPLOY.md) for hosting, and [docs/ANALYTICS.md](docs/ANALYTICS.md) for the
@@ -11,8 +11,8 @@ S3 + Athena attendance-analytics pipeline.
 
 ## Features
 
-- Daily auto-posted check-in board, updated live and grouped by position
-- Position-based responses: GK / Defense / Midfield / Offense, or Out
+- Daily auto-posted check-in board, updated live
+- Simple Available / Out responses
 - Automatic locking a configurable window before kickoff, plus captain manual lock/unlock
 - Pre-kickoff announcements (lobby-up, now-locked) and non-responder reminders
 - Full response history persisted for attendance analytics

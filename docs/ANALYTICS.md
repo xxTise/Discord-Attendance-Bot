@@ -40,7 +40,7 @@ here; no QuickSight).
    ```bash
    sqlite3 -header -csv proclubs.db "
    SELECT e.event_date, e.event_type, e.start_time AS kickoff,
-          p.discord_id, p.display_name, r.state, r.position, r.created_at
+          p.discord_id, p.display_name, r.state, r.created_at
    FROM responses r
    JOIN events e ON e.id = r.event_id
    JOIN players p ON p.id = r.player_id
@@ -58,7 +58,7 @@ here; no QuickSight).
    CREATE EXTERNAL TABLE IF NOT EXISTS proclubs.responses (
      event_date string, event_type string, kickoff string,
      discord_id string, display_name string, state string,
-     position string, created_at string
+     created_at string
    )
    ROW FORMAT SERDE 'org.apache.hadoop.hive.serde2.OpenCSVSerde'
    WITH SERDEPROPERTIES ('separatorChar' = ',', 'quoteChar' = '"')
@@ -93,17 +93,7 @@ ORDER BY availability_pct DESC;
 
 **Chronically unavailable** (≤ 30% available): same as above with `<= 30`.
 
-**Most-played position:**
-```sql
-SELECT display_name, position, COUNT(*) AS times
-FROM proclubs.responses
-WHERE state = 'AVAILABLE' AND position <> ''
-GROUP BY display_name, position
-ORDER BY display_name, times DESC;
-```
-
-> Stored values: `state` is `AVAILABLE` / `UNAVAILABLE`; `position` is
-> `GK` / `DEFENSE` / `MIDFIELD` / `OFFENSE` (empty when unavailable).
+> Stored values: `state` is `AVAILABLE` / `UNAVAILABLE`.
 
 ### Roadmap
 

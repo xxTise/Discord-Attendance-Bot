@@ -14,7 +14,7 @@ from typing import Optional
 import discord
 from sqlalchemy import select
 
-from database.models import Event, EventStatus, EventType, Position, ResponseState
+from database.models import Event, EventStatus, EventType, ResponseState
 from services import event_service
 from services.errors import EventLockedError, ResponseValidationError
 from utils.interactions import ephemeral_then_delete
@@ -109,7 +109,6 @@ async def apply_response(
     interaction: discord.Interaction,
     *,
     state: ResponseState,
-    position: Optional[Position] = None,
     eta: Optional[str],
     message_id: int,
     channel_id: int,
@@ -134,7 +133,6 @@ async def apply_response(
                 discord_id=user.id,
                 display_name=user.display_name,
                 state=state,
-                position=position,
                 eta=eta,
             )
         except (EventLockedError, ResponseValidationError) as exc:
@@ -142,8 +140,7 @@ async def apply_response(
             return
         await session.commit()
 
-    detail = f"{state.value}/{position.value}" if position else state.value
-    log.info("Recorded %s for %s on message %s", detail, user.id, message_id)
+    log.info("Recorded %s for %s on message %s", state.value, user.id, message_id)
     # Silently acknowledge — the refreshed board is the confirmation.
     if not interaction.response.is_done():
         await interaction.response.defer()
