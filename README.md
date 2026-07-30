@@ -28,9 +28,6 @@ flowchart LR
     S3 --> A[Athena SQL]
 ```
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for the full spec, [DEPLOY.md](DEPLOY.md) for
-hosting, and [docs/ANALYTICS.md](docs/ANALYTICS.md) for the analytics pipeline.
-
 ## Tech Stack
 
 - Python 3.12, discord.py
