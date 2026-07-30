@@ -19,14 +19,8 @@ shows up over time.
 
 ## Architecture
 
-```mermaid
-flowchart LR
-    D[Discord] <--> B[Bot: cogs + views]
-    B --> S[services/ business logic]
-    S --> DB[(SQLite via async SQLAlchemy)]
-    DB -->|CSV export| S3[(S3 data lake)]
-    S3 --> A[Athena SQL]
-```
+<img width="1020" height="443" alt="Screenshot 2026-07-30 at 6 00 14 PM" src="https://github.com/user-attachments/assets/3b463432-61cf-4dae-9e0c-39ec3beef81c" />
+
 
 ## Tech Stack
 
