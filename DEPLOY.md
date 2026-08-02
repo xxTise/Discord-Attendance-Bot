@@ -8,6 +8,12 @@ Terraform, or Docker.
 Discord. It serves no traffic, so there is no load balancer, no inbound web port,
 and no database server — SQLite is a file on disk.
 
+This document describes the live instance, created by hand in the console. For a
+reproducible version of the same setup (EC2 + security group + IAM role) that can
+stand up a *second* environment from scratch, see [`terraform/`](terraform/). For
+day-2 operations (health checks, restart, rollback) see
+[`RUNBOOK.md`](RUNBOOK.md).
+
 ---
 
 ## 0. Cost summary
@@ -57,6 +63,11 @@ The bot needs **no inbound ports** except SSH for you to manage it.
 
 That's it. No HTTP/HTTPS inbound, no database port. Restricting SSH to *My IP* keeps
 the box effectively invisible.
+
+> **History:** this security group was found with SSH also open to `0.0.0.0/0`
+> (in addition to the admin IP) — an unintentional exposure from manual console
+> setup, since fixed. It's exactly the kind of drift that infrastructure-as-code
+> (see `terraform/`) makes visible in a diff instead of silently accumulating.
 
 ---
 
@@ -159,42 +170,36 @@ chmod +x ~/Discord-Attendance-Bot/deploy.sh
 To ship a new version: push to GitHub from your laptop, then on the server run
 `./deploy.sh`.
 
-### Option B — Auto-deploy on push (GitHub Actions, optional)
+### Option B — Auto-deploy on push (GitHub Actions, implemented)
 
-Add `.github/workflows/deploy.yml` in the repo:
+Implemented at `.github/workflows/ci-cd.yml`: on every push/PR it runs the 28-test
+suite; on push to `main` (only if tests passed) it deploys automatically.
 
-```yaml
-name: Deploy to EC2
-on:
-  push:
-    branches: [main]
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Deploy over SSH
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ubuntu
-          key: ${{ secrets.EC2_SSH_KEY }}
-          script: |
-            cd /home/ubuntu/Discord-Attendance-Bot
-            git pull --ff-only
-            .venv/bin/pip install -q -r requirements.txt
-            sudo systemctl restart proclubs
-```
+**This deliberately does not use SSH.** An earlier draft of this doc (see git
+history) suggested `appleboy/ssh-action`, but GitHub-hosted runners have no fixed
+IP — making that work means either opening port 22 to `0.0.0.0/0` (undoing the
+"SSH from My IP only" rule in §2) or babysitting GitHub's rotating IP ranges as a
+security-group allowlist. Neither is worth it.
 
-Add repo **Settings → Secrets and variables → Actions**:
-- `EC2_HOST` — the instance's public IP / Elastic IP
-- `EC2_SSH_KEY` — the **private** key (contents of your `.pem`)
+Instead, the deploy job authenticates to AWS via **GitHub OIDC** (no stored AWS
+keys — just a role ARN, which isn't secret) and runs the deploy commands through
+**AWS Systems Manager Run Command**, which needs zero inbound ports at all:
 
-Two caveats for Option B:
-1. GitHub's runners have dynamic IPs, so SSH (port 22) must be open beyond *My IP*
-   (e.g. `0.0.0.0/0`). If you do this, ensure **key-only** SSH (password auth is off
-   by default on Ubuntu AMIs) — or prefer AWS Systems Manager Run Command to avoid
-   opening SSH at all (more setup, most secure).
-2. Allow the deploy to restart the service without a password — see §5.
+- One-time AWS setup: a GitHub OIDC identity provider + an IAM role
+  (`github-actions-deploy-proclubs`) trusted only for
+  `repo:xxTise/Discord-Attendance-Bot:ref:refs/heads/main`, scoped to
+  `ssm:SendCommand`/`ssm:GetCommandInvocation` on this one instance. The instance's
+  own role (`proclubs-ec2-s3`) needs `AmazonSSMManagedInstanceCore` attached so SSM
+  can reach it.
+- Repo config: **Settings → Secrets and variables → Actions → Variables** (not
+  Secrets — none of these are sensitive): `AWS_DEPLOY_ROLE_ARN`, `AWS_REGION`,
+  `EC2_INSTANCE_ID`.
+- Since SSM Run Command executes as root by default, the sudoers NOPASSWD
+  workaround in §5 (needed for password-less `systemctl restart` over SSH) isn't
+  needed for this path.
+
+Manual `./deploy.sh` (Option A) still works and is the right choice if you ever
+need to deploy from a box that isn't CI.
 
 ---
 
@@ -232,8 +237,9 @@ sudo systemctl start proclubs
 sudo systemctl status proclubs     # should show "active (running)"
 ```
 
-If you use Option B (Actions auto-deploy), let the `ubuntu` user restart the service
-without a password:
+Not needed for the implemented Option B (SSM Run Command executes as root
+already). Only relevant if you ever automate a restart over plain SSH instead —
+in that case, let the `ubuntu` user restart the service without a password:
 
 ```bash
 echo 'ubuntu ALL=(ALL) NOPASSWD: /bin/systemctl restart proclubs' | \
@@ -312,6 +318,37 @@ If you ever drop to a 512 MB instance and see OOM kills, add 1 GB swap:
 sudo fallocate -l 1G /swapfile && sudo chmod 600 /swapfile
 sudo mkswap /swapfile && sudo swapon /swapfile
 echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+```
+
+---
+
+## 8. Monitoring & alerting (CloudWatch Agent)
+
+`systemd`'s `Restart=always` means a crash-looping bot never shows up in plain
+EC2 status/CPU metrics — and EC2 doesn't expose memory as a native metric at
+all. Real "is the process actually alive" and memory monitoring needs the
+CloudWatch Agent installed on the box, publishing custom metrics that three
+CloudWatch Alarms watch (process down, memory high, CPU high — SNS emails you
+on any of them). See the implementation plan / `terraform/main.tf` for the
+alarm definitions (same thresholds are used for the live instance's manually
+created alarms, since Terraform here doesn't manage the live box — see
+`terraform/README.md`).
+
+```bash
+# on the instance, after the role has CloudWatchAgentServerPolicy attached
+wget https://s3.amazonaws.com/amazoncloudwatch-agent/ubuntu/amd64/latest/amazon-cloudwatch-agent.deb
+sudo dpkg -i -E ./amazon-cloudwatch-agent.deb
+
+sudo nano /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json
+# paste the ProClubsBot config (mem_used_percent, disk used_percent, procstat
+# on "Discord-Attendance-Bot/main.py") — see implementation plan Section 3
+
+sudo /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl \
+  -a fetch-config -m ec2 -s \
+  -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json
+sudo systemctl enable amazon-cloudwatch-agent
+
+aws cloudwatch list-metrics --namespace ProClubsBot --region us-east-1   # verify
 ```
 
 ---

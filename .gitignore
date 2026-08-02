@@ -11,3 +11,10 @@ venv/
 .DS_Store
 *.log
 nohup.out
+
+# Terraform
+terraform/.terraform/
+terraform/terraform.tfstate
+terraform/terraform.tfstate.backup
+terraform/terraform.tfvars
+*.pem
