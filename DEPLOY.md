@@ -341,7 +341,13 @@ sudo dpkg -i -E ./amazon-cloudwatch-agent.deb
 
 sudo nano /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json
 # paste the ProClubsBot config (mem_used_percent, disk used_percent, procstat
-# on "Discord-Attendance-Bot/main.py") — see implementation plan Section 3
+# on "Discord-Attendance-Bot/.venv/bin/python" — NOT ".../main.py": the
+# systemd ExecStart runs the venv's python binary with main.py as a bare
+# argument, so "Discord-Attendance-Bot/main.py" is never a contiguous
+# substring of the real process command line and silently matches nothing.
+# procstat also publishes a third "pid_finder=native" dimension alongside
+# InstanceId/pattern — any alarm on this metric needs all three or it will
+# never receive data. See implementation plan Section 3 / terraform/main.tf.
 
 sudo /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl \
   -a fetch-config -m ec2 -s \

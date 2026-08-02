@@ -148,7 +148,12 @@ resource "aws_cloudwatch_metric_alarm" "bot_process_down" {
   metric_name         = "procstat_lookup_pid_count"
   dimensions = {
     InstanceId = aws_instance.bot.id
-    pattern    = "Discord-Attendance-Bot/main.py"
+    pattern    = "Discord-Attendance-Bot/.venv/bin/python"
+    # procstat publishes this as a third dimension alongside InstanceId/pattern
+    # (native pid lookup, as opposed to a pidfile) — an alarm's dimension set
+    # must match the metric's exactly, or it never receives data (found this
+    # the hard way applying the equivalent alarm to the live instance).
+    pid_finder = "native"
   }
   statistic           = "Average"
   period              = 60
