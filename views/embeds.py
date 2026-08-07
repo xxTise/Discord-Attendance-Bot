@@ -35,7 +35,7 @@ def _progress_bar(available: int, squad_size: int) -> str:
 
 
 def _names(responses: list[Response]) -> str:
-    return " · ".join(r.player.display_name for r in responses) or "—"
+    return "\n".join(r.player.display_name for r in responses) or "—"
 
 
 def build_checkin_embed(
