@@ -14,13 +14,14 @@ from database.models import (
     Response,
     ResponseState,
 )
+from services.analytics_service import AttendanceRow
 from utils.time_utils import (
     due_ping_offsets,
     format_ampm,
     lock_deadline_from_kickoff,
     parse_time_flexible,
 )
-from views.embeds import build_checkin_embed
+from views.embeds import build_analytics_embed, build_checkin_embed
 
 
 @pytest.mark.parametrize(
@@ -166,3 +167,21 @@ def test_embed_ignores_legacy_late_rows():
     )
     assert "Legacy" not in str(embed.to_dict())
     assert "Ava" in _field(embed, "Available")
+
+
+def test_analytics_embed_empty_rows():
+    embed = build_analytics_embed([])
+    assert embed.description == "No attendance data yet."
+
+
+def test_analytics_embed_ranks_players():
+    rows = [
+        AttendanceRow("Hamza", events_responded=10, times_available=9, availability_pct=90.0),
+        AttendanceRow("Mercii", events_responded=10, times_available=5, availability_pct=50.0),
+    ]
+    embed = build_analytics_embed(rows)
+    field = _field(embed, "Availability")
+    # Ranked order preserved (caller/query controls ordering, embed just renders it).
+    assert field.index("Hamza") < field.index("Mercii")
+    assert "90%" in field and "9/10" in field
+    assert "50%" in field and "5/10" in field

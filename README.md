@@ -16,6 +16,7 @@ shows up over time.
 - Staged pre-kickoff reminders for non-responders
 - Full response history persisted for attendance analytics
 - S3 + Athena pipeline for ad-hoc SQL attendance analytics
+- Automated weekly attendance-rate report posted to Discord (no manual query-running)
 
 ## Architecture
 

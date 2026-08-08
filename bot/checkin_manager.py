@@ -17,7 +17,7 @@ from sqlalchemy import select
 from database.models import Event, EventStatus, EventType, ResponseState
 from services import event_service
 from services.errors import EventLockedError, ResponseValidationError
-from utils.interactions import ephemeral_then_delete
+from utils.interactions import ephemeral_then_delete, resolve_channel
 from utils.time_utils import (
     as_utc,
     at_local_time_utc,
@@ -32,14 +32,7 @@ log = logging.getLogger("proclubs.checkin")
 
 
 async def _get_channel(bot: discord.Client, channel_id: int) -> Optional[discord.abc.Messageable]:
-    channel = bot.get_channel(channel_id)
-    if channel is None:
-        try:
-            channel = await bot.fetch_channel(channel_id)
-        except discord.HTTPException:
-            log.warning("Could not resolve channel %s", channel_id)
-            return None
-    return channel
+    return await resolve_channel(bot, channel_id)
 
 
 def _render_embed(bot: discord.Client, event: Event, responses) -> discord.Embed:

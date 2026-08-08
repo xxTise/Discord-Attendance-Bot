@@ -6,7 +6,7 @@ import logging
 
 import discord
 
-from bot import checkin_manager
+from bot import analytics_manager, checkin_manager
 
 log = logging.getLogger("proclubs.jobs")
 
@@ -26,3 +26,8 @@ async def auto_lock_job(bot: discord.Client) -> None:
 async def prekickoff_ping_job(bot: discord.Client) -> None:
     """Fire automatic pings at the configured minutes before kickoff."""
     await checkin_manager.run_prekickoff_pings(bot)
+
+
+async def weekly_analytics_job(bot: discord.Client) -> None:
+    """Post the weekly attendance-rate report (Monday, at check-in time)."""
+    await analytics_manager.post_weekly_report(bot)

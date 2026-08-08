@@ -50,8 +50,22 @@ def create_scheduler(bot: discord.Client) -> AsyncIOScheduler:
         replace_existing=True,
     )
 
+    # Same time as the daily check-in, but only on Mondays — reuses checkin_time
+    # rather than adding a dedicated setting for one weekly job.
+    scheduler.add_job(
+        jobs.weekly_analytics_job,
+        CronTrigger(
+            day_of_week="mon", hour=checkin.hour, minute=checkin.minute, timezone=tz
+        ),
+        args=[bot],
+        id="weekly_analytics",
+        replace_existing=True,
+    )
+
     log.info(
-        "Scheduler configured: check-in %s, auto-lock + pre-kickoff pings every 1m (%s)",
+        "Scheduler configured: check-in %s, auto-lock + pre-kickoff pings every 1m, "
+        "weekly analytics report Mondays at %s (%s)",
+        bot.settings.checkin_time,
         bot.settings.checkin_time,
         bot.settings.timezone,
     )

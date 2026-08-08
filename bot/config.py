@@ -41,6 +41,13 @@ class Settings(BaseSettings):
 
     database_url: str = "sqlite+aiosqlite:///./proclubs.db"
 
+    # Weekly attendance analytics report (Athena query -> Discord embed).
+    # 0 disables the report; the scheduled job logs a warning and skips it.
+    analytics_channel_id: int = 0
+    aws_region: str = "us-east-1"
+    athena_database: str = "proclubs"
+    athena_output_s3: str = "s3://proclubs-analytics-to/athena-results/"
+
 
 @lru_cache
 def get_settings() -> Settings:

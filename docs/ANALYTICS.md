@@ -7,6 +7,7 @@ a deliberate split between operational and analytical workloads (OLTP vs. OLAP).
 |---|---|---|---|
 | **Operational** | In-app `/attendance` command (Discord) | Fast, private roster report the team uses for keep/cut decisions — reliable regulars, chronically unavailable, and non-participants ("ghosts") | Planned |
 | **Analytical** | AWS **S3 + Athena** | Serverless data lake for ad-hoc SQL analytics and portfolio/BI reporting | **Implemented** |
+| **Analytical, automated** | Weekly Discord report (`bot/analytics_manager.py`) | Runs the attendance-rate query and posts a ranked embed to a configured channel every Monday — no manual query-running needed | **Implemented** |
 
 Only the in-app layer can detect *ghosts* (server members who have never responded),
 because the analytical export only contains people who have responded at least once — the
@@ -99,4 +100,7 @@ ORDER BY availability_pct DESC;
 
 - Automate the nightly export from the bot's scheduler (replacing the manual re-upload).
 - Build the in-app `/attendance` command (covers ghost detection).
-- Optional: partition the S3 data by date and add a QuickSight dashboard.
+- ~~Optional: QuickSight dashboard~~ — considered and rejected: the weekly Discord report
+  above delivers the same "see attendance without running SQL by hand" value without adding
+  a whole BI service for a few-dozen-rows-a-day dataset. Consistent with the "batch + SQL,
+  not BI subscription" rationale above.

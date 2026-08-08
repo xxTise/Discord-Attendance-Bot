@@ -13,6 +13,7 @@ from zoneinfo import ZoneInfo
 import discord
 
 from database.models import Event, EventStatus, Response, ResponseState
+from services.analytics_service import AttendanceRow
 from utils.time_utils import as_utc, at_local_time_utc, format_ampm, parse_hhmm
 
 # Only these states render. Legacy LATE rows (Late was removed) are ignored.
@@ -100,4 +101,28 @@ def build_checkin_embed(
         lock_txt = f"Locks at {format_ampm(as_utc(event.lock_deadline).astimezone(tz).timetz())}{suffix}"
     footer_text = f"{footer_name} · {lock_txt}" if footer_name else lock_txt
     embed.set_footer(text=footer_text, icon_url=brand_icon_url)
+    return embed
+
+
+def build_analytics_embed(
+    rows: list[AttendanceRow],
+    *,
+    brand_name: str = "",
+    brand_icon_url: str | None = None,
+) -> discord.Embed:
+    """Build the weekly attendance-rate embed from ranked Athena rows."""
+    embed = discord.Embed(title="📊 Weekly Attendance Report", color=_OPEN_COLOR)
+    if brand_name:
+        embed.set_author(name=brand_name, icon_url=brand_icon_url)
+
+    if not rows:
+        embed.description = "No attendance data yet."
+        return embed
+
+    lines = [
+        f"**{row.availability_pct:.0f}%** — {row.display_name} "
+        f"({row.times_available}/{row.events_responded})"
+        for row in rows
+    ]
+    embed.add_field(name="Availability, ranked", value="\n".join(lines)[:1024], inline=False)
     return embed
